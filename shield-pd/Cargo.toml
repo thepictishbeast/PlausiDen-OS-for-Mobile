@@ -1,0 +1,16 @@
+[package]
+name = "shield-pd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shield Protection Domain — network interception, DNS pollution, TLS diversification for PlausiDenOS"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }

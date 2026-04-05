@@ -1,0 +1,19 @@
+[package]
+name = "brain-pd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Brain Protection Domain — LFI engine, data generation decisions, swarm control for PlausiDenOS"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+ed25519-dalek = { workspace = true }
+zeroize = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+# plausiden-engine = { path = "../../PlausiDen-Engine/engine-core" }  # TODO

@@ -1,0 +1,21 @@
+[package]
+name = "vault-pd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Vault Protection Domain — deniable encrypted storage, multiple personalities, duress PIN, Scorched Earth for PlausiDenOS"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chacha20poly1305 = { workspace = true }
+argon2 = { workspace = true }
+ed25519-dalek = { workspace = true }
+zeroize = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
