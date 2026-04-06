@@ -1,0 +1,41 @@
+/*
+ * PlausiDenOS — Vault protection domain.
+ *
+ * The Vault PD owns every byte written to persistent storage. It
+ * manages the personality system (multiple encrypted volumes on
+ * the same filesystem, only one mounted at any moment), the duress
+ * PIN handler, and the Scorched Earth key destruction path.
+ *
+ * Vault is the only PD with direct driver access to flash storage.
+ * Brain and Shield get their reads and writes through VaultInterface.
+ *
+ * The duress PIN handler is implemented as a constant-time
+ * comparison against every registered PIN; a match on the duress
+ * slot triggers an irreversible key scrub before returning.
+ * There is no indication to the caller that the match was duress.
+ */
+
+import "interfaces.camkes";
+
+component Vault {
+    /* Inbound: everyone talks to vault. */
+    provides VaultInterface vault_api;
+
+    /* Hardware: direct eMMC/UFS access. */
+    hardware_storage flash;
+
+    /* Shared-memory region for block-level I/O. */
+    dataport Buf(524288) block_buffer;
+
+    /* Scheduling: vault gets its own scheduling context with
+     * enough headroom to handle encrypt-on-write without starving
+     * itself. */
+    attribute int priority = 110;
+    attribute int mcs_budget_us = 8000;
+    attribute int mcs_period_us = 20000;
+
+    /* Personality system sizing. Must match the PD_PERSONALITY_COUNT
+     * and PD_VAULT_KEY_SLOTS the kernel config sets. */
+    attribute int max_personalities = 5;
+    attribute int max_key_slots = 8;
+}

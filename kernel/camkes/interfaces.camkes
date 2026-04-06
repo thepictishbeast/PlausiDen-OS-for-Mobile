@@ -1,0 +1,87 @@
+/*
+ * PlausiDenOS — shared CAmkES interface definitions.
+ *
+ * These interfaces are the narrow, typed contracts between the
+ * four protection domains. Every cross-domain call goes through
+ * one of them. The goal is to make the cross-PD attack surface
+ * fully enumerable — if an interface isn't here, it can't be
+ * invoked across a PD boundary.
+ */
+
+import <std_connector.camkes>;
+
+/*
+ * Vault ←→ Brain / Shield / Android
+ * Read/write deniable encrypted volumes. Duress PIN handling.
+ */
+procedure VaultInterface {
+    /* Open a volume by personality id. Returns a session handle the
+     * caller uses for subsequent reads and writes. */
+    int open_volume(in int personality_id, out int session_handle);
+
+    int read_block(in int session_handle, in int block_id,
+                   out uint8_t data[4096]);
+    int write_block(in int session_handle, in int block_id,
+                    in uint8_t data[4096]);
+
+    int close_volume(in int session_handle);
+
+    /* Duress PIN: entering it unlocks the decoy personality and
+     * irreversibly scrubs the real key material from RAM. The
+     * response carries no indication that the pin was duress. */
+    int submit_pin(in int pin_hash_lo, in int pin_hash_hi);
+
+    /* Scorched Earth: destroy every personality's key material
+     * atomically. No recovery path. */
+    int scorched_earth(in int auth_token);
+};
+
+/*
+ * Shield ←→ Brain / Android
+ * Network packet injection, DNS pollution, forensic detection.
+ */
+procedure ShieldInterface {
+    /* Publish a network fingerprint the brain wants shield to
+     * diversify. Shield rotates TLS JA3 and DNS resolver layouts
+     * to match. */
+    int publish_fingerprint(in int flavour, in int intensity);
+
+    /* Submit raw packets the brain wants synthesized into the
+     * outbound traffic stream. */
+    int inject_decoy(in uint8_t packet[1500], in int len);
+
+    /* Check whether shield has detected forensic analysis on the
+     * device. Returns a boolean plus the signature that triggered. */
+    int forensic_check(out int detected, out int signature);
+};
+
+/*
+ * Brain ←→ Shield / Vault / Android
+ * LFI engine, synthetic-data generation decisions.
+ */
+procedure BrainInterface {
+    /* Generate a batch of synthetic events of the given flavour and
+     * intensity. The brain uses vault and shield internally. */
+    int generate_batch(in int flavour, in int intensity, in int count,
+                       out int job_id);
+
+    /* Poll a generation job's status. */
+    int job_status(in int job_id, out int progress_percent,
+                   out int complete);
+
+    /* Cancel a pending job. */
+    int cancel_job(in int job_id);
+};
+
+/*
+ * Android shim ←→ all three PDs
+ * Thin bidirectional channel for GrapheneOS paravirtualization.
+ */
+procedure AndroidShimInterface {
+    /* Android -> PDs: forward a JSON-encoded request. */
+    int forward_request(in uint8_t req[4096], in int len,
+                        out uint8_t resp[4096], out int resp_len);
+
+    /* PDs -> Android: raise a signal (e.g. duress activated). */
+    int raise_signal(in int signal_id);
+};

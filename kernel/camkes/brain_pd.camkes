@@ -1,0 +1,31 @@
+/*
+ * PlausiDenOS — Brain protection domain.
+ *
+ * The Brain PD hosts the LFI (Logic-Free Inference) engine that
+ * decides what synthetic data to generate, when to generate it,
+ * and which shield/vault primitives to call. It has no direct
+ * access to the network or to long-term storage — every call goes
+ * through Shield and Vault, respectively.
+ */
+
+import "interfaces.camkes";
+
+component Brain {
+    /* Inbound: android shim can ask the brain to generate a batch. */
+    provides BrainInterface brain;
+
+    /* Outbound: shield and vault are the only side effects the
+     * brain can cause. */
+    uses ShieldInterface shield;
+    uses VaultInterface vault;
+
+    /* Shared-memory data port for large batches the brain ships to
+     * shield without RPC round-trips. */
+    dataport Buf(65536) brain_out;
+
+    /* Scheduling: brain runs at medium priority with a small
+     * budget so a runaway LFI job cannot starve shield or vault. */
+    attribute int priority = 100;
+    attribute int mcs_budget_us = 5000;
+    attribute int mcs_period_us = 20000;
+}

@@ -1,0 +1,37 @@
+/*
+ * PlausiDenOS — Shield protection domain.
+ *
+ * The Shield PD owns every byte the device puts on the wire or
+ * pulls off of it. It runs the DNS pollution mixer, rotates TLS
+ * fingerprints on behalf of every userspace HTTPS client, and
+ * watches for forensic-analysis signatures (strace attempts,
+ * debugger attach, USB mass-storage enumeration from known
+ * extraction tools).
+ *
+ * Shield is the only PD with direct driver access to the network
+ * hardware. Brain and Android must go through ShieldInterface.
+ */
+
+import "interfaces.camkes";
+
+component Shield {
+    /* Inbound: brain publishes fingerprints; android shim checks
+     * forensic status. */
+    provides ShieldInterface shield_api;
+
+    /* Outbound: shield can ask vault to sign outbound packets with
+     * ephemeral keys so every observation burns its own key slot. */
+    uses VaultInterface vault;
+
+    /* Hardware: direct access to the network controller's MMIO. */
+    hardware_ethernet net;
+
+    /* Shared-memory ring buffer for packet capture. */
+    dataport Buf(262144) packet_ring;
+
+    /* Scheduling: shield runs at the highest priority because it
+     * must meet network latency deadlines. */
+    attribute int priority = 120;
+    attribute int mcs_budget_us = 3000;
+    attribute int mcs_period_us = 5000;
+}

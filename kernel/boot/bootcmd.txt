@@ -1,0 +1,57 @@
+### PlausiDenOS — U-Boot boot command script.
+###
+### Loads the signed boot envelope from the device's primary
+### storage partition, verifies the Ed25519 signature against the
+### embedded bootkey, and hands off to seL4 at EL2 with the
+### prepared device tree.
+###
+### This is a plain-text U-Boot script. Compile to a bootable
+### .scr with:
+###   mkimage -A arm64 -T script -C none -d bootcmd.txt boot.scr
+
+### ---- Load stage ------------------------------------------------
+mmc dev 0
+mmc rescan
+
+### PlausiDenOS signed boot envelope lives at offset 0x400 of the
+### boot partition. The envelope contains:
+###   - 64-byte Ed25519 signature
+###   -  4-byte payload length (big-endian)
+###   -    N-byte payload: device tree + kernel image + CAmkES
+###        composition blob
+load mmc 0:1 0x90000000 plausiden-boot.env
+
+### ---- Verify stage ----------------------------------------------
+### U-Boot's `ed25519_verify` is provided by the PlausiDen boot
+### fragment compiled into this image. It expects the public key
+### in the `plausiden_bootkey` environment variable.
+setenv plausiden_bootkey_path /bootkey.pub
+ed25519_verify 0x90000000 ${plausiden_bootkey_path}
+if test $? != 0; then
+    echo "!! PlausiDenOS boot envelope signature invalid — halting."
+    reset
+fi
+
+### ---- Extract stage ---------------------------------------------
+### Payload layout:
+###   0x00000000  seL4 kernel ELF
+###   0x00800000  rootserver ELF
+###   0x01000000  CAmkES composition blob
+###   0x01400000  flattened device tree (FDT)
+setenv kernel_addr   0x80080000
+setenv rootserver    0x80880000
+setenv fdt_addr      0x81480000
+
+### Copy sections out of the envelope into their execution addresses.
+cp.b 0x90000040 $kernel_addr  0x00800000
+cp.b 0x90800040 $rootserver   0x00800000
+cp.b 0x91480040 $fdt_addr     0x00100000
+
+### ---- Hand off --------------------------------------------------
+### PlausiDenOS expects EL2 entry so CAmkES can set up the
+### hypervisor for the paravirtualized GrapheneOS guest.
+bootelf $kernel_addr
+
+### If bootelf returned, something went wrong.
+echo "!! seL4 kernel returned to U-Boot — halting."
+reset

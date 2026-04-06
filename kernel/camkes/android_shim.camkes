@@ -1,0 +1,31 @@
+/*
+ * PlausiDenOS — Android shim.
+ *
+ * A thin bidirectional channel between the paravirtualized
+ * GrapheneOS guest and the three native protection domains. The
+ * shim does not implement any policy; it translates JSON requests
+ * from Android into typed CAmkES RPC calls and returns the
+ * responses verbatim.
+ */
+
+import "interfaces.camkes";
+
+component AndroidShim {
+    /* Inbound: Android guest forwards requests and signals. */
+    provides AndroidShimInterface shim;
+
+    /* Outbound: the shim calls into all three native PDs. */
+    uses BrainInterface brain;
+    uses ShieldInterface shield;
+    uses VaultInterface vault;
+
+    /* Shared-memory ring buffer for the Android ↔ shim queue. */
+    dataport Buf(131072) android_queue;
+
+    /* Scheduling: shim priority sits between brain and shield
+     * because it must respond quickly to user-visible actions
+     * but must not preempt the network stack. */
+    attribute int priority = 115;
+    attribute int mcs_budget_us = 2000;
+    attribute int mcs_period_us = 10000;
+}

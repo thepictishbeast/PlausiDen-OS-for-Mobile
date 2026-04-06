@@ -1,0 +1,110 @@
+/*
+ * PlausiDenOS — top-level assembly.
+ *
+ * Wires the four protection domains together with the exact set
+ * of narrow typed connections PlausiDenOS permits. Anything not
+ * listed here is not reachable across a PD boundary.
+ *
+ * Threat model: each PD is assumed compromised in turn. The
+ * system must remain safe if any single PD is hostile. The
+ * cross-PD connections enforce that: Brain cannot write to
+ * flash directly (must go through Vault), Shield cannot read
+ * disk (must go through Vault), Vault cannot touch the network
+ * (must go through Shield). No single PD can exfiltrate data
+ * without at least one other PD's cooperation.
+ */
+
+import "interfaces.camkes";
+import "brain_pd.camkes";
+import "shield_pd.camkes";
+import "vault_pd.camkes";
+import "android_shim.camkes";
+
+assembly {
+    composition {
+        /* Instantiate the four PDs. */
+        component Brain        brain_pd;
+        component Shield       shield_pd;
+        component Vault        vault_pd;
+        component AndroidShim  android;
+
+        /* ---- Narrow connections, one per direction per pair ---- */
+
+        /* Brain → Shield: fingerprint publishing + decoy injection. */
+        connection seL4RPCCall brain_to_shield(
+            from brain_pd.shield,
+            to   shield_pd.shield_api);
+
+        /* Brain → Vault: read/write into encrypted volumes. */
+        connection seL4RPCCall brain_to_vault(
+            from brain_pd.vault,
+            to   vault_pd.vault_api);
+
+        /* Shield → Vault: sign outbound packets with per-observation
+         * ephemeral keys. */
+        connection seL4RPCCall shield_to_vault(
+            from shield_pd.vault,
+            to   vault_pd.vault_api);
+
+        /* Android shim → Brain: forward requests originating in the
+         * paravirtualized GrapheneOS guest. */
+        connection seL4RPCCall android_to_brain(
+            from android.brain,
+            to   brain_pd.brain);
+
+        /* Android shim → Shield: shim can query forensic status. */
+        connection seL4RPCCall android_to_shield(
+            from android.shield,
+            to   shield_pd.shield_api);
+
+        /* Android shim → Vault: only for duress PIN and scorched
+         * earth entry points. Block I/O is not routed through this
+         * link — Android gets a read-only pseudo-filesystem served
+         * by Brain. */
+        connection seL4RPCCall android_to_vault(
+            from android.vault,
+            to   vault_pd.vault_api);
+
+        /* ---- Shared memory for bulk data ---- */
+
+        /* Brain writes generated batches into a shared buffer that
+         * shield consumes. Avoids copying 64 KiB across an RPC. */
+        connection seL4SharedData brain_to_shield_bulk(
+            from brain_pd.brain_out,
+            to   shield_pd.packet_ring);
+    }
+
+    configuration {
+        /* Priority and MCS budget assignments. Higher priority
+         * preempts lower. Shield is highest because network is
+         * latency-sensitive. Vault next because crypto is
+         * compute-heavy but bounded. Android shim sits between
+         * brain and vault so user-visible actions feel responsive
+         * without starving storage I/O. Brain is lowest because
+         * a runaway LFI job must not jeopardise the rest. */
+        brain_pd.priority       = 100;
+        brain_pd.mcs_budget_us  = 5000;
+        brain_pd.mcs_period_us  = 20000;
+
+        shield_pd.priority      = 120;
+        shield_pd.mcs_budget_us = 3000;
+        shield_pd.mcs_period_us = 5000;
+
+        vault_pd.priority       = 110;
+        vault_pd.mcs_budget_us  = 8000;
+        vault_pd.mcs_period_us  = 20000;
+
+        android.priority        = 115;
+        android.mcs_budget_us   = 2000;
+        android.mcs_period_us   = 10000;
+
+        /* Tighten the vault's capability space: no untyped grants,
+         * explicit allowlist of services. */
+        vault_pd.allow_untyped_alloc = false;
+
+        /* Duress PIN hash slots — matches PD_VAULT_KEY_SLOTS from
+         * config.cmake. */
+        vault_pd.max_key_slots    = 8;
+        vault_pd.max_personalities = 5;
+    }
+}
