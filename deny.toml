@@ -1,0 +1,51 @@
+# cargo-deny configuration — PlausiDen-OS-for-Mobile (seL4-based
+# sovereign mobile OS; contains brain-pd, shield-pd, vault-pd
+# protection domain crates).
+#
+# Uniform PlausiDen policy (authored 2026-04-19, Claude 3):
+# - vulnerability=deny, unmaintained/unsound/yanked=warn.
+# - deny unlicensed + copyleft; allow permissive set.
+# - Every dep must come from crates.io.
+# - rustls-first posture — no openssl / native-tls / curl / git2.
+#
+# OS-specific: PD crates target seL4 and should be no_std compatible
+# where possible. When a PD crate pins a no_std dep with an unusual
+# license, add it here with a dated justification.
+
+[advisories]
+vulnerability = "deny"
+unmaintained = "warn"
+unsound = "warn"
+yanked = "warn"
+
+[licenses]
+unlicensed = "deny"
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "BSL-1.0",
+    "CC0-1.0",
+    "Zlib",
+]
+copyleft = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+[bans]
+multiple-versions = "warn"
+deny = [
+    { name = "openssl-sys" },
+    { name = "openssl" },
+    { name = "native-tls" },
+    { name = "git2" },
+    { name = "curl" },
+    { name = "curl-sys" },
+]
