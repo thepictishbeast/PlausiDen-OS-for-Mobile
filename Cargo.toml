@@ -10,7 +10,7 @@ resolver = "2"
 version = "0.1.0"
 edition = "2024"
 license = "BSL-1.1"
-repository = "https://github.com/redcaptian1917/PlausiDen-OS-for-Mobile"
+repository = "https://github.com/thepictishbeast/PlausiDen-OS-for-Mobile"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
